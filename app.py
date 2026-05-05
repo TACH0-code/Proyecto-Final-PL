@@ -6,15 +6,12 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Image
 from reportlab.lib.styles import getSampleStyleSheet
 import os
 
-# =========================
-# CONFIG UI
-# =========================
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("green")
 
-# =========================
+
 # CONEXIÓN MYSQL
-# =========================
+
 def conectar():
     return mysql.connector.connect(
         host="localhost",
@@ -23,20 +20,17 @@ def conectar():
         database="inventario_db"
     )
 
-# =========================
 # HASH
-# =========================
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# =========================
+
 # LOGIN
-# =========================
 class Login(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Login - Inventario")
+        self.title("Login")
         self.geometry("400x400")
 
         frame = ctk.CTkFrame(self)
@@ -72,9 +66,8 @@ class Login(ctk.CTk):
 
         conn.close()
 
-# =========================
+
 # APP INVENTARIO
-# =========================
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -118,9 +111,8 @@ class App(ctk.CTk):
 
         self.cargar()
 
-    # =========================
+
     # CARGAR DATOS
-    # =========================
     def cargar(self):
         self.lista.delete("0.0", "end")
         conn = conectar()
@@ -128,13 +120,11 @@ class App(ctk.CTk):
 
         cursor.execute("SELECT * FROM inventario")
         for row in cursor.fetchall():
-            self.lista.insert("end", f"{row}\n")
+            self.lista.insert("end", f"{row[0]} | {row[1]} | {row[2]} | {row[3]}\n")
 
         conn.close()
 
-    # =========================
     # BUSCAR
-    # =========================
     def buscar(self):
         texto = self.buscar_entry.get()
 
@@ -147,19 +137,18 @@ class App(ctk.CTk):
         resultados = cursor.fetchall()
 
         for row in resultados:
-            self.lista.insert("end", f"{row}\n")
+            self.lista.insert("end", f"{row[0]} | {row[1]} | {row[2]} | {row[3]}\n")
 
         conn.close()
 
-    # =========================
+    
     # SELECCIONAR
-    # =========================
     def seleccionar(self, event):
         try:
             linea = self.lista.get("insert linestart", "insert lineend")
-            datos = eval(linea)
+            datos = linea.split(" | ")
 
-            self.id_seleccionado = datos[0]
+            self.id_seleccionado = int(datos[0])
 
             self.producto.delete(0, 'end')
             self.producto.insert(0, datos[1])
@@ -169,12 +158,12 @@ class App(ctk.CTk):
 
             self.precio.delete(0, 'end')
             self.precio.insert(0, datos[3])
-        except:
-            pass
 
-    # =========================
+        except Exception as e:
+            print("Error al seleccionar:", e)
+
+
     # CRUD
-    # =========================
     def agregar(self):
         conn = conectar()
         cursor = conn.cursor()
@@ -208,7 +197,7 @@ class App(ctk.CTk):
 
     def eliminar(self):
         if self.id_seleccionado is None:
-            print("Selecciona un producto")
+            print("Selecciona un producto primero")
             return
 
         conn = conectar()
@@ -216,12 +205,16 @@ class App(ctk.CTk):
 
         cursor.execute("DELETE FROM inventario WHERE id=%s", (self.id_seleccionado,))
         conn.commit()
+
+        print("Eliminado ID:", self.id_seleccionado)
+
         conn.close()
+
+        self.id_seleccionado = None
         self.cargar()
 
-    # =========================
+
     # GRÁFICO
-    # =========================
     def grafico(self):
         conn = conectar()
         cursor = conn.cursor()
@@ -237,9 +230,8 @@ class App(ctk.CTk):
         plt.title("Stock por Producto")
         plt.show()
 
-    # =========================
+
     # PDF
-    # =========================
     def exportar_pdf(self):
         conn = conectar()
         cursor = conn.cursor()
@@ -268,9 +260,8 @@ class App(ctk.CTk):
 
         print("PDF generado")
 
-# =========================
+
 # MAIN
-# =========================
 if __name__ == "__main__":
     login = Login()
     login.mainloop()
