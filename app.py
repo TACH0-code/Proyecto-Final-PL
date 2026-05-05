@@ -1,60 +1,37 @@
 import customtkinter as ctk
-import sqlite3
+import mysql.connector
 import hashlib
 import matplotlib.pyplot as plt
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Image
 from reportlab.lib.styles import getSampleStyleSheet
 import os
 
-# CONFIGURACIÓN UI
+# =========================
+# CONFIG UI
+# =========================
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("green")
 
-
-# BASE DE DATOS
+# =========================
+# CONEXIÓN MYSQL
+# =========================
 def conectar():
-    return sqlite3.connect("inventario.db")
-
-def crear_tablas():
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
-        password TEXT
+    return mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="1234",
+        database="inventario_db"
     )
-    """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS inventario (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        producto TEXT,
-        cantidad INTEGER,
-        precio REAL
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
+# =========================
+# HASH
+# =========================
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-def crear_usuario():
-    conn = conectar()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO usuarios (username, password) VALUES (?, ?)",
-                       ("admin", hash_password("1234")))
-    except:
-        pass
-    conn.commit()
-    conn.close()
-
-
+# =========================
 # LOGIN
+# =========================
 class Login(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -79,8 +56,10 @@ class Login(ctk.CTk):
         conn = conectar()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM usuarios WHERE username=? AND password=?",
-                       (self.user.get(), hash_password(self.password.get())))
+        cursor.execute(
+            "SELECT * FROM usuarios WHERE username=%s AND password=%s",
+            (self.user.get(), hash_password(self.password.get()))
+        )
 
         if cursor.fetchone():
             self.destroy()
@@ -93,8 +72,9 @@ class Login(ctk.CTk):
 
         conn.close()
 
-
+# =========================
 # APP INVENTARIO
+# =========================
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -106,7 +86,7 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(self, text="Gestión de Inventario", font=("Arial", 22)).pack(pady=10)
 
-        #BUSCADOR
+        # BUSCADOR
         self.buscar_entry = ctk.CTkEntry(self, placeholder_text="Buscar producto...")
         self.buscar_entry.pack(pady=5)
 
@@ -124,8 +104,8 @@ class App(ctk.CTk):
 
         # BOTONES
         ctk.CTkButton(self, text="Agregar", command=self.agregar).pack(pady=5)
-        ctk.CTkButton(self, text="Actualizar Seleccionado", command=self.actualizar).pack(pady=5)
-        ctk.CTkButton(self, text="Eliminar Seleccionado", command=self.eliminar).pack(pady=5)
+        ctk.CTkButton(self, text="Actualizar", command=self.actualizar).pack(pady=5)
+        ctk.CTkButton(self, text="Eliminar", command=self.eliminar).pack(pady=5)
 
         ctk.CTkButton(self, text="Ver Gráfico", command=self.grafico).pack(pady=5)
         ctk.CTkButton(self, text="Exportar PDF", command=self.exportar_pdf).pack(pady=5)
@@ -134,12 +114,13 @@ class App(ctk.CTk):
         self.lista = ctk.CTkTextbox(self, width=700, height=250)
         self.lista.pack(pady=10)
 
-        # EVENTO CLICK
         self.lista.bind("<ButtonRelease-1>", self.seleccionar)
 
         self.cargar()
 
-    # FUNCION PARA CARGAR DATOS
+    # =========================
+    # CARGAR DATOS
+    # =========================
     def cargar(self):
         self.lista.delete("0.0", "end")
         conn = conectar()
@@ -151,9 +132,9 @@ class App(ctk.CTk):
 
         conn.close()
 
-
-    # FUNCION DE BUSCAR
-   
+    # =========================
+    # BUSCAR
+    # =========================
     def buscar(self):
         texto = self.buscar_entry.get()
 
@@ -162,7 +143,7 @@ class App(ctk.CTk):
         conn = conectar()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM inventario WHERE producto LIKE ?", (f"%{texto}%",))
+        cursor.execute("SELECT * FROM inventario WHERE producto LIKE %s", (f"%{texto}%",))
         resultados = cursor.fetchall()
 
         for row in resultados:
@@ -170,8 +151,9 @@ class App(ctk.CTk):
 
         conn.close()
 
-
-    # SELECCION DE REGISTROS
+    # =========================
+    # SELECCIONAR
+    # =========================
     def seleccionar(self, event):
         try:
             linea = self.lista.get("insert linestart", "insert lineend")
@@ -187,18 +169,20 @@ class App(ctk.CTk):
 
             self.precio.delete(0, 'end')
             self.precio.insert(0, datos[3])
-
         except:
             pass
 
-
+    # =========================
     # CRUD
+    # =========================
     def agregar(self):
         conn = conectar()
         cursor = conn.cursor()
 
-        cursor.execute("INSERT INTO inventario (producto, cantidad, precio) VALUES (?, ?, ?)",
-                       (self.producto.get(), self.cantidad.get(), self.precio.get()))
+        cursor.execute(
+            "INSERT INTO inventario (producto, cantidad, precio) VALUES (%s, %s, %s)",
+            (self.producto.get(), self.cantidad.get(), self.precio.get())
+        )
 
         conn.commit()
         conn.close()
@@ -213,9 +197,9 @@ class App(ctk.CTk):
         cursor = conn.cursor()
 
         cursor.execute("""
-        UPDATE inventario 
-        SET producto=?, cantidad=?, precio=? 
-        WHERE id=?
+            UPDATE inventario 
+            SET producto=%s, cantidad=%s, precio=%s 
+            WHERE id=%s
         """, (self.producto.get(), self.cantidad.get(), self.precio.get(), self.id_seleccionado))
 
         conn.commit()
@@ -230,14 +214,14 @@ class App(ctk.CTk):
         conn = conectar()
         cursor = conn.cursor()
 
-        cursor.execute("DELETE FROM inventario WHERE id=?", (self.id_seleccionado,))
+        cursor.execute("DELETE FROM inventario WHERE id=%s", (self.id_seleccionado,))
         conn.commit()
         conn.close()
-
         self.cargar()
 
- 
+    # =========================
     # GRÁFICO
+    # =========================
     def grafico(self):
         conn = conectar()
         cursor = conn.cursor()
@@ -253,8 +237,9 @@ class App(ctk.CTk):
         plt.title("Stock por Producto")
         plt.show()
 
- 
+    # =========================
     # PDF
+    # =========================
     def exportar_pdf(self):
         conn = conectar()
         cursor = conn.cursor()
@@ -283,10 +268,9 @@ class App(ctk.CTk):
 
         print("PDF generado")
 
+# =========================
 # MAIN
+# =========================
 if __name__ == "__main__":
-    crear_tablas()
-    crear_usuario()
-
     login = Login()
     login.mainloop()
